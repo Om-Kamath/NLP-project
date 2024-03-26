@@ -1,5 +1,5 @@
 venv/
-API
+API.py
 job_descriptions.csv
 job_descriptions_cleaned.csv
 .vscode

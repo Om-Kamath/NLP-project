@@ -12,6 +12,7 @@ from langchain_community.embeddings.sentence_transformer import (
     SentenceTransformerEmbeddings,
 )
 import pandas as pd
+import API
 
 # create the open-source embedding function
 embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
@@ -20,7 +21,7 @@ embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2"
 
 db2 = Chroma(persist_directory="./chroma_db", embedding_function=embedding_function)
 
-API_KEY = "Enter API KEY here"
+API_KEY = API.API_KEY
 # Creating an instance of the LangChain class
 llm = ChatGoogleGenerativeAI(model="gemini-pro",google_api_key=API_KEY)
 agent = create_csv_agent(llm,"academic_routes_final.csv",verbose=True)
