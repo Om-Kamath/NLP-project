@@ -3,4 +3,4 @@ API
 job_descriptions.csv
 chroma_db/
 job_descriptions_cleaned.csv
-.vscode/
+.vscode
