@@ -11,10 +11,12 @@ from langchain_text_splitters import CharacterTextSplitter
 from langchain_community.embeddings.sentence_transformer import (
     SentenceTransformerEmbeddings,
 )
+from duckduckgo_search import DDGS
 import pandas as pd
 import API
 import ast
 import time
+
 
 
 
@@ -52,59 +54,72 @@ slider = st.slider("How many courses would you like to see?", 1, 10, 3)
 courses = db2.similarity_search(course_recommendation, k=slider)
 st.divider()
 
-# Display the courses fetched using similarity search
+courses_list = []
+# Display the courses fetched using similarity search with profiling using bars
 st.markdown("### Here are some courses that you might be interested in:")
 for course in courses:
     course_name = course.page_content.split(":")[0]
+    courses_list.append(course_name)
     description = df[df['Program'] == course_name]['Description'].values[0]
     st.markdown(f'##### {course_name}')
     st.markdown(f'<p>{description}</p>', unsafe_allow_html=True)
 
+    # Prompt Template
+    metrics_template = """
+    Course: {course}
+    Description: {description}
 
-# Prompt Template
-full_template = """User Data: {user_profile}
+    Based on the information provided, analyse the course into the following categories:
+    1. Technical
+    2. Creative
+    3. Analytical
 
-User Request: {course_recommendation}
+    You need to provide scores out of 10 for each of the categories as a array.
 
-Courses: {courses}
+    For example
+    <Input>
+    Course: Computer Science
+    Description: This course is about coding and working with data.
 
-Based on the information provided, analyse the user's profile into the following categories:
-1. Technical
-2. Creative
-3. Analytical
+    <Output>
+    [8, 5, 7]
+    """
 
-You need to provide scores out of 10 for each of the categories as a array.
+    full_prompt = PromptTemplate.from_template(metrics_template)
+    prompt = full_prompt.format(course=course_name, description=description)
 
-For eg.
-[8, 5, 7]
-"""
+    data = llm.invoke(prompt).content
+    data = ast.literal_eval(data)
 
-full_prompt = PromptTemplate.from_template(full_template)
-prompt = full_prompt.format(user_profile=user_profile, course_recommendation=course_recommendation, courses=courses)
+    technical_bar = st.progress(0, text="Technical")
 
-data = llm.invoke(prompt).content
-data = ast.literal_eval(data)
-
-
-
-technical_bar = st.progress(0, text="Technical")
-
-for percent_complete in range(data[0]*10):
-    time.sleep(0.01)
-    technical_bar.progress(percent_complete + 1, text="Technical")
-
-
-creative_bar = st.progress(0, text="Creative")
-
-for percent_complete in range(data[1]*10):
-    time.sleep(0.01)
-    creative_bar.progress(percent_complete + 1, text="Creative")
+    for percent_complete in range(data[0]*10):
+        time.sleep(0.01)
+        technical_bar.progress(percent_complete + 1, text="Technical")
 
 
+    creative_bar = st.progress(0, text="Creative")
 
-analytical_bar = st.progress(0, text="Analytical")
+    for percent_complete in range(data[1]*10):
+        time.sleep(0.01)
+        creative_bar.progress(percent_complete + 1, text="Creative")
 
-for percent_complete in range(data[2]*10):
-    time.sleep(0.01)
-    analytical_bar.progress(percent_complete + 1, text="Analytical")
+
+
+    analytical_bar = st.progress(0, text="Analytical")
+
+    for percent_complete in range(data[2]*10):
+        time.sleep(0.01)
+        analytical_bar.progress(percent_complete + 1, text="Analytical")
+
+
+st.divider()
+
+# Personalised Resources
+st.markdown("### Personalised Resources:")
+
+resources = DDGS().text(f"Courses for {courses_list}", max_results=10)
+search = pd.DataFrame(resources)
+for i in range(5):
+    st.markdown(f"[{search['title'][i]}]({search['href'][i]})")
 
