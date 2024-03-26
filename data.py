@@ -49,7 +49,12 @@ print(len(docs))
 print("Documents split successfully")
 print(docs[0])
 
-embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+# create simple ids
+ids = [str(i) for i in range(1, len(docs) + 1)]
 
-db = Chroma.from_documents(docs, embedding_function, persist_directory="./chroma_db")
+embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+db = Chroma.from_documents(docs, embedding_function, persist_directory="./chroma_db", ids=ids)
+
+
+
 print("Data loaded successfully")

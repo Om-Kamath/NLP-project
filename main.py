@@ -28,7 +28,7 @@ agent = create_csv_agent(llm,"academic_routes_final.csv",verbose=True)
 
 
 # Title of the app
-st.title("CareerX")
+st.title("Career Navigator")
 
 
 st.header("Ask about Educational Prospects")
