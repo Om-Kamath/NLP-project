@@ -48,7 +48,7 @@ for course in courses:
 for course in courses:
     course_name = course.page_content.split(":")[0]
     st.markdown(f'## What is covered in {course_name}?')
-    response = agent.run(f"Fetch the Description for Program:'{course_name}'")
+    response = agent.run(f"Find the Description for Program Name:'{course_name}' in string format.")
     st.markdown(f"<p>{response}</p>", unsafe_allow_html=True)
 
 
@@ -56,7 +56,7 @@ data = []
 # Create table using for loop in streamlit
 for course in courses:
     course_name = course.page_content.split(":")[0]
-    subject_areas = agent.run(f"Fetch the Subject Areas for Program Name: '{course_name}'")
+    subject_areas = agent.run(f"Find the Subject Areas for Program Name: '{course_name}' in string format.")
     data.append({"Course Name": course_name, "Subject Areas": subject_areas})
 
 df = pd.DataFrame(data)
