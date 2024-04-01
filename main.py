@@ -61,15 +61,15 @@ To calculate the learning curve, consider the current qualification and then com
 The learning curve will be higher if the course is different from the current qualification. Like, if an engineer wants to become a gardener,
 it will be a higher learning curve (around 8-9). If an engineer wants to become a data scientist, it will be a lower learning curve (around 2-3).
 
-You need to provide scores out of 10 for each of the categories as a array in string ONLY.
+You need to provide scores out of 10 for each of the categories. The datatype of response should be an array of integers only.
 
 For example
-[Input]
+#Input
 Current Qualification: Mechanical Engineering
 Course: Computer Science
 Description: This course is about coding and working with data.
 
-[Output]
+#Output
 [8, 5, 7, 5]
 """
 
@@ -111,12 +111,12 @@ db_skills = Chroma(persist_directory="./chroma_db_skills", embedding_function=em
 df = pd.read_excel("main_data/Occupation Data.xlsx")
 
 # Uncomment for GEMINI
-# API_KEY = API.API_KEY_GEMINI
-# llm = ChatGoogleGenerativeAI(model="gemini-pro",google_api_key=API_KEY)
+API_KEY = API.API_KEY_GEMINI
+llm = ChatGoogleGenerativeAI(model="gemini-pro",google_api_key=API_KEY)
 
 # Uncomment for OpenAI
-API_KEY = API.API_KEY_OPENAI
-llm= ChatOpenAI(api_key=API.API_KEY_OPENAI,model="gpt-3.5-turbo")
+# API_KEY = API.API_KEY_OPENAI
+# llm= ChatOpenAI(api_key=API.API_KEY_OPENAI,model="gpt-3.5-turbo")
 
 # Spacy Setup
 nlp = spacy.load('en_core_web_sm')
@@ -137,14 +137,13 @@ matcher.add("ACADEMIC_QUALIFICATION", None, *patterns)
 # Sidebar
 option = st.sidebar.selectbox(
     'Select an option',
-    ['Course Recommendations', 'Resume Analyser']
+    ['Home', 'Resume Analyser']
 )
 
 
-if option == 'Course Recommendations':
+if option == 'Home':
     # Title of the app
     st.title("Academic Navigator")
-    st.header("Course Recommendations")
 
 
     # User input
@@ -217,7 +216,7 @@ if option == 'Course Recommendations':
         # Display the courses fetched using similarity search with profiling using bars
         with st.spinner("Analyzing your preferences..."):
             courses = db_jobs.similarity_search(course_recommendation, k=slider)
-            st.markdown("### Course Recommendations")
+            st.write(courses)
             for course in courses:
                 course_name = course.page_content.split(":")[0]
                 courses_list.append(course_name)
@@ -263,19 +262,14 @@ if option == 'Course Recommendations':
                 for percent_complete in range(data[3]*10):
                     time.sleep(0.01)
                     learning_curve_bar.progress(percent_complete + 1, text="Learning Curve",)
-            st.divider()
 
-            # Personalised Resources
-            st.markdown("### Personalised Resources")
-            resources = search(f"Courses for {courses_list}", num_results=10,advanced=True)
-            st.write(resources)
-            # resources = DDGS().text(f"Courses for {courses_list}", max_results=5)
-            # search = pd.DataFrame(resources)
-            # for i in range(5):
-            #     href = search['href'][i].replace(" ","%20")
-            #     st.markdown(f"[{search['title'][i]}]({href})")
+                with st.expander("View Personalized Courses"):
+                    resources = search(f"Courses for {course}", num_results=2,advanced=True)
+                    for i in resources:
+                        if "geeksforgeeks" in i.url:
+                            continue
+                        st.markdown(f"**[{i.title}]({i.url})**")
 
-            st.divider()
             
 
 elif option == 'Resume Analyser':
