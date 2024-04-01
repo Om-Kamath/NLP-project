@@ -14,14 +14,34 @@ from langchain_community.embeddings.sentence_transformer import (
 )
 from langchain_community.document_loaders import PyPDFLoader
 from duckduckgo_search import DDGS
+from googlesearch import search
 from doctr.io import DocumentFile
 from doctr.models import ocr_predictor
 import pandas as pd
 import API
-import ast
+# import ast
 import time
-import os
+# import os
+import spacy
+from spacy import displacy
+import contractions
+import specializations_lower
+from spacy.matcher import PhraseMatcher
+from spacy.tokens import Span
 
+# stExpanderDetails
+#############################################
+# CSS styling
+st.markdown(
+    """
+    <style>
+    [data-testid="stExpander"] div[data-testid="stExpanderDetails"] {
+        overflow-x: auto;
+    }
+    </style>
+    """
+,unsafe_allow_html=True
+)
 
 
 #############################################
@@ -98,6 +118,19 @@ df = pd.read_excel("main_data/Occupation Data.xlsx")
 API_KEY = API.API_KEY_OPENAI
 llm= ChatOpenAI(api_key=API.API_KEY_OPENAI,model="gpt-3.5-turbo")
 
+# Spacy Setup
+nlp = spacy.load('en_core_web_sm')
+
+# Load a blank spaCy NER model
+custom_nlp = spacy.blank("en")
+
+# Initialize a PhraseMatcher with the academic qualifications
+matcher = PhraseMatcher(custom_nlp.vocab, attr="LOWER")
+academic_qualifications = specializations_lower.majors
+patterns = [nlp(qualification) for qualification in academic_qualifications]
+print(patterns)
+matcher.add("ACADEMIC_QUALIFICATION", None, *patterns)
+
 ###########################################
 # APP BEGINS HERE
 
@@ -123,6 +156,64 @@ if option == 'Course Recommendations':
 
     courses_list = []
     if submit:
+        with st.status("Preprocessing User Data..."):
+            user_profile = contractions.fix(user_profile)
+            st.markdown(f"""**Expanding contractions:**   
+                        {user_profile}""")
+            doc_user_profile = custom_nlp(user_profile)
+            course_recommendation = contractions.fix(course_recommendation)
+            st.markdown(f"""**Expanding contractions:**   
+                        {course_recommendation}""")
+            doc_course_recommendation = nlp(course_recommendation)
+
+            # Generate HTML for the named entity visualization
+            html = displacy.render(doc_user_profile, style='ent')
+            matches = matcher(doc_user_profile)
+
+            for match_id, start, end in matches:
+                span = Span(doc_user_profile, start, end, label=match_id)
+                doc_user_profile.ents = list(doc_user_profile.ents) + [span]  # add span to doc.ents
+            
+            html = displacy.render(doc_user_profile, style='ent')
+            # Display the HTML in the Streamlit app
+            st.markdown(html, unsafe_allow_html=True)
+
+            # Generate HTML for the named entity visualization for course_recommendation
+            html = displacy.render(doc_course_recommendation, style='dep')
+            st.markdown(html, unsafe_allow_html=True)
+
+            # Perform tokenization using spacy
+            tokens_user_profile = [token.text for token in doc_user_profile]
+            st.write("Tokens in user profile:", tokens_user_profile)
+
+            tokens_course_recommendation = [token.text for token in doc_course_recommendation]
+            st.write("Tokens in course recommendation:", tokens_course_recommendation)
+
+            # Perform tokenization using spacy on user_profile, remove stop words and handle whitespace
+            tokens_user_profile = [token.text for token in doc_user_profile if not token.is_stop and not token.is_space]
+            st.write("Removing Stopwords from user profile:", tokens_user_profile)
+
+            # Perform tokenization using spacy on course_recommendation, remove stop words and handle whitespace
+            tokens_course_recommendation = [token.text for token in doc_course_recommendation if not token.is_stop and not token.is_space]
+            st.write("Removing Stopwords from course recommendation:", tokens_course_recommendation)
+
+            #Convert to lowercase
+            tokens_user_profile = [token.lower_ for token in doc_user_profile if not token.is_stop and not token.is_space]
+            st.write("Lowercase tokens in user profile:", tokens_user_profile)
+
+            # Perform tokenization using spacy on course_recommendation, remove stop words, handle whitespace, and convert to lowercase
+            tokens_course_recommendation = [token.lower_ for token in doc_course_recommendation if not token.is_stop and not token.is_space]
+            st.write("Lowercase tokens in course recommendation:", tokens_course_recommendation)
+
+            # Perform lemmatization on user_profile
+            lemmas_user_profile = [token.lemma_ for token in doc_user_profile if not token.is_stop and not token.is_space]
+            st.write("Lemmas in user profile:", lemmas_user_profile)
+
+            # Perform lemmatization on course_recommendation
+            lemmas_course_recommendation = [token.lemma_ for token in doc_course_recommendation if not token.is_stop and not token.is_space]
+            st.write("Lemmas in course recommendation:", lemmas_course_recommendation)
+
+
         # Display the courses fetched using similarity search with profiling using bars
         with st.spinner("Analyzing your preferences..."):
             courses = db_jobs.similarity_search(course_recommendation, k=slider)
@@ -176,15 +267,16 @@ if option == 'Course Recommendations':
 
             # Personalised Resources
             st.markdown("### Personalised Resources")
-            resources = DDGS().text(f"Courses for {courses_list}", max_results=10)
-            search = pd.DataFrame(resources)
-            for i in range(5):
-                href = search['href'][i].replace(" ","%20")
-                st.markdown(f"[{search['title'][i]}]({href})")
+            resources = search(f"Courses for {courses_list}", num_results=10,advanced=True)
+            st.write(resources)
+            # resources = DDGS().text(f"Courses for {courses_list}", max_results=5)
+            # search = pd.DataFrame(resources)
+            # for i in range(5):
+            #     href = search['href'][i].replace(" ","%20")
+            #     st.markdown(f"[{search['title'][i]}]({href})")
 
             st.divider()
-            # Roadmap
-            st.markdown("### Roadmap")
+            
 
 elif option == 'Resume Analyser':
     st.title("Academic Navigator")

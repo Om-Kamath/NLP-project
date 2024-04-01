@@ -6,4 +6,5 @@ job_descriptions_cleaned.csv
 db_28_2_excel/
 chroma_db_jobs/
 chroma_db_skills/
-
+*.pyc
+__pycache__
