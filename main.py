@@ -61,9 +61,9 @@ Text: {resume_text}
 """
 
 resume_skill_gap = """
-List out the skills missing by calculating the Skills Required - Skills Acquired. Provide descriptions of the same.
-Skills Required and type of job: {skills_required}
-Skills Acquired: {skills_provided}
+Missing skills are the skills that a job/career require but the candidate lacks. List out the missing skills by tallying the skills required with the skills acquired. Provide the name and descriptions of the missing skills.
+Required skills and type of job: {required_skills}
+Acquired skills of candidate: {acquired_skills}
 """
 #############################################
 # Functions
@@ -91,12 +91,12 @@ db_skills = Chroma(persist_directory="./chroma_db_skills", embedding_function=em
 df = pd.read_excel("main_data/Occupation Data.xlsx")
 
 # Uncomment for GEMINI
-API_KEY = API.API_KEY_GEMINI
-llm = ChatGoogleGenerativeAI(model="gemini-pro",google_api_key=API_KEY)
+# API_KEY = API.API_KEY_GEMINI
+# llm = ChatGoogleGenerativeAI(model="gemini-pro",google_api_key=API_KEY)
 
 # Uncomment for OpenAI
-# API_KEY = API.API_KEY_OPENAI
-# llm= ChatOpenAI(api_key=API.API_OPENAI_KEY,model="gpt-3.5-turbo")
+API_KEY = API.API_KEY_OPENAI
+llm= ChatOpenAI(api_key=API.API_KEY_OPENAI,model="gpt-3.5-turbo")
 
 ###########################################
 # APP BEGINS HERE
@@ -110,7 +110,7 @@ option = st.sidebar.selectbox(
 
 if option == 'Course Recommendations':
     # Title of the app
-    st.title("Career Navigator")
+    st.title("Academic Navigator")
     st.header("Course Recommendations")
 
 
@@ -141,7 +141,10 @@ if option == 'Course Recommendations':
 
                 data = llm.invoke(prompt).content
                 print(data)
-                data = ast.literal_eval(data)
+                #print type of data
+                print(type(data))
+                # data = ast.literal_eval(data)
+                data = [int(float(n)) for n in eval(data)]
 
                 technical_bar = st.progress(0, text="Technical")
 
@@ -184,41 +187,42 @@ if option == 'Course Recommendations':
             st.markdown("### Roadmap")
 
 elif option == 'Resume Analyser':
-    st.title("Career Navigator")
+    st.title("Academic Navigator")
     st.header("Resume Analyser")
 
     st.write("Upload your resume to get started:")
     uploaded_file = st.file_uploader("Choose a file", type=["pdf"])
     
-    whole_words = []
-    per_line_words = []
-    if uploaded_file is not None:
-        with st.spinner("Analyzing your resume..."):
-            pdf = uploaded_file.read()
-            single_img_doc = DocumentFile.from_pdf(pdf)
-            result, json_output = ocr(single_img_doc)
-            for block in json_output["pages"][0]["blocks"]:
-                for line in block["lines"]:
-                    line_words = []
-                    for word in line["words"]:
-                        whole_words.append(word["value"])
-                        line_words.append(word["value"])
-                    per_line_words.append(line_words)
+    if uploaded_file:
+        whole_words = []
+        per_line_words = []
+        if uploaded_file is not None:
+            with st.spinner("Analyzing your resume..."):
+                pdf = uploaded_file.read()
+                single_img_doc = DocumentFile.from_pdf(pdf)
+                result, json_output = ocr(single_img_doc)
+                for block in json_output["pages"][0]["blocks"]:
+                    for line in block["lines"]:
+                        line_words = []
+                        for word in line["words"]:
+                            whole_words.append(word["value"])
+                            line_words.append(word["value"])
+                        per_line_words.append(line_words)
 
 
-        pdf_content = ""
-        for line in per_line_words:
-            pdf_content += " ".join(line) + "\n"
+            pdf_content = ""
+            for line in per_line_words:
+                pdf_content += " ".join(line) + "\n"
 
-        with st.spinner("Churning out the results..."):
-            full_prompt = PromptTemplate.from_template(resume_template)
-            prompt = full_prompt.format(resume_text=pdf_content)
-            data = llm.invoke(prompt).content
-            # st.write(data)
-            skills = db_skills.max_marginal_relevance_search(data, k=5, fetch_k=15)
-            # skills = db_skills.as_retriever(search_type='mmr').get_relevant_documents(data)[:5]
-            # st.write(skills)
-            skill_gap = PromptTemplate.from_template(resume_skill_gap)
-            skill_gap = skill_gap.format(skills_required=skills, skills_provided=data)
-            data_skills = llm.invoke(skill_gap).content
-            st.write(data_skills)
+            with st.spinner("Churning out the results..."):
+                full_prompt = PromptTemplate.from_template(resume_template)
+                prompt = full_prompt.format(resume_text=pdf_content)
+                data = llm.invoke(prompt).content
+                # st.write(data)
+                skills = db_skills.max_marginal_relevance_search(data, k=5, fetch_k=15)
+                # skills = db_skills.as_retriever(search_type='mmr').get_relevant_documents(data)[:5]
+                # st.write(skills)
+                skill_gap = PromptTemplate.from_template(resume_skill_gap)
+                skill_gap = skill_gap.format(required_skills=skills, acquired_skills=data)
+                data_skills = llm.invoke(skill_gap).content
+                st.write(data_skills)
