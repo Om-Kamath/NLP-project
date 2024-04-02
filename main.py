@@ -83,7 +83,7 @@ Description: This course is about coding and working with data.
 resume_template = """
 Act Like a skilled or very experience ATS(Application Tracking System)
 with a deep understanding of all fields. Your task is fetch only the 'Professional Skills' and the 'Job Type' the candidate is looking out 
-for based on the introduction from the text provided and format it in a structured way. If the 'Job Type' is not specified in the text, give it your best guess based on the skills.
+for based on the introduction from the text provided and format it in a structured way. If the 'Job Type' is not specified in the text, give it your best guess based on the skills. Output should always contain 'Professional Skills' and 'Job Type'. There should be a single 'Job Type' only.
 Text: {resume_text}
 """
 
@@ -359,7 +359,7 @@ elif option == 'Resume Analyser':
                 job_type = job_type_section.strip("** \n")
                 job_type_search = f"For roles like {job_type}"
                 st.markdown(f"""#### For roles like:    
-- {job_type}""")
+{job_type}""")
                 required_skills = db_skills.similarity_search(job_type_search, k=10)
                 required_skills = [item.page_content for item in required_skills]
                 skill_gap = PromptTemplate.from_template(resume_skill_gap)
