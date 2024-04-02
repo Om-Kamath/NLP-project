@@ -46,6 +46,13 @@ st.markdown(
 
 #############################################
 # Templates
+
+rephrase_template = """
+Rephrase the following text such that it has a realistic tone
+"The degrees offered are: {degrees}"
+Output should be provided as is without any extra text. Headings should be bold and description should start on new line.
+"""
+
 metrics_template = """
 Current Qualification: {degree}
 Course: {course}
@@ -75,15 +82,46 @@ Description: This course is about coding and working with data.
 
 resume_template = """
 Act Like a skilled or very experience ATS(Application Tracking System)
-with a deep understanding of all fields. Your task is fetch only the professional skills and the type of job the candidate is looking out 
-for based on the introduction (if not provided, give it your best guess) from the text provided and format it in a structured way.
+with a deep understanding of all fields. Your task is fetch only the 'Professional Skills' and the 'Job Type' the candidate is looking out 
+for based on the introduction from the text provided and format it in a structured way. If the 'Job Type' is not specified in the text, give it your best guess based on the skills.
 Text: {resume_text}
 """
 
 resume_skill_gap = """
-Missing skills are the skills that a job/career require but the candidate lacks. List out the missing skills by tallying the skills required with the skills acquired. Provide the name and descriptions of the missing skills.
-Required skills and type of job: {required_skills}
+**Prompt:**
+
+Imagine you're an adept Application Tracking System (ATS) with comprehensive knowledge across various fields. Your task is to identify missing skills required for a specific job or career by comparing the skills listed as necessary with those possessed by the candidate. You'll need to list out the missing skills by subtracting the acquired skills from the required skills and provide their names, descriptions, and examples of usage. Provide only the output.
+
+**Example:**
+
+*Input:*
+
+Required skills and type of job: 
+Skills: [Typescript, MongoDB, React]
+Job Type: Web Developer
+
+Acquired Skills of Candidate: [Bootstrap, CSS, Typescript]
+
+*Output:*
+
+| Missing Skill | Description                                               |
+|---------------|-----------------------------------------------------------|
+| MongoDB       | A document-oriented NoSQL database used in web development for storing and retrieving data efficiently.                                                                                                   |
+| React         | A JavaScript library for building user interfaces, widely used for creating interactive UI components in web applications.                                                   |
+
+*Input:*
+
+Required skills: {required_skills}
+Job Type: {job_type}
 Acquired skills of candidate: {acquired_skills}
+
+*Output:*
+
+| Missing Skill | Description                                               |
+|---------------|-----------------------------------------------------------|
+| (Missing Skills) | (Description) |
+
+
 """
 #############################################
 # Functions
@@ -106,6 +144,7 @@ embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2"
 # load the vectors for similarity search
 db_jobs = Chroma(persist_directory="./chroma_db_jobs", embedding_function=embedding_function)
 db_skills = Chroma(persist_directory="./chroma_db_skills", embedding_function=embedding_function)
+db_academic = Chroma(persist_directory="./chroma_db_academic", embedding_function=embedding_function)
 
 # Fetching the csv for program description
 df = pd.read_excel("main_data/Occupation Data.xlsx")
@@ -148,7 +187,7 @@ if option == 'Home':
 
     # User input
     user_profile = st.text_input("What are you currently pursuing?", "I am doing a degree in Computer Science.")
-    course_recommendation = st.text_area("What are you looking out for?", "I like to code and work with data.")
+    course_recommendation = st.text_area("What is your liking?", "I like to code and work with data.")
     slider = st.slider("How many courses would you like to see?", 1, 10, 3)
     submit = st.button("Submit")
     st.divider()
@@ -160,6 +199,7 @@ if option == 'Home':
             st.markdown(f"""**Expanding contractions:**   
                         {user_profile}""")
             doc_user_profile = custom_nlp(user_profile)
+            doc_user_profile_nlp = nlp(user_profile)
             course_recommendation = contractions.fix(course_recommendation)
             st.markdown(f"""**Expanding contractions:**   
                         {course_recommendation}""")
@@ -205,7 +245,7 @@ if option == 'Home':
             st.write("Lowercase tokens in course recommendation:", tokens_course_recommendation)
 
             # Perform lemmatization on user_profile
-            lemmas_user_profile = [token.lemma_ for token in doc_user_profile if not token.is_stop and not token.is_space]
+            lemmas_user_profile = [token.lemma_ for token in doc_user_profile_nlp if not token.is_stop and not token.is_space]
             st.write("Lemmas in user profile:", lemmas_user_profile)
 
             # Perform lemmatization on course_recommendation
@@ -216,10 +256,9 @@ if option == 'Home':
         # Display the courses fetched using similarity search with profiling using bars
         with st.spinner("Analyzing your preferences..."):
             courses = db_jobs.similarity_search(course_recommendation, k=slider)
-            st.write(courses)
             for course in courses:
                 course_name = course.page_content.split(":")[0]
-                courses_list.append(course_name)
+                # courses_list.append(course_name)
                 description = df[df['Title'] == course_name]['Description'].values[0]
                 st.markdown(f'##### {course_name}')
                 st.markdown(f'<p>{description}</p>', unsafe_allow_html=True)
@@ -270,6 +309,17 @@ if option == 'Home':
                             continue
                         st.markdown(f"**[{i.title}]({i.url})**")
 
+                with st.status("View Potential Degrees"):
+                    degree_query = f"What should be studied for {course_name}"
+                    degrees = db_academic.similarity_search(degree_query, k=2)
+                    degrees = [degree.page_content for degree in degrees]
+                    rephrase_prompt = PromptTemplate.from_template(rephrase_template)
+                    rephrase_text = rephrase_prompt.format(degrees=degrees)
+                    data = llm.invoke(rephrase_text).content
+                    st.write(data)
+
+
+
             
 
 elif option == 'Resume Analyser':
@@ -304,11 +354,15 @@ elif option == 'Resume Analyser':
                 full_prompt = PromptTemplate.from_template(resume_template)
                 prompt = full_prompt.format(resume_text=pdf_content)
                 data = llm.invoke(prompt).content
-                # st.write(data)
-                skills = db_skills.max_marginal_relevance_search(data, k=5, fetch_k=15)
-                # skills = db_skills.as_retriever(search_type='mmr').get_relevant_documents(data)[:5]
-                # st.write(skills)
+                skills_section, job_type_section = data.split("Job Type:")
+                acquired_skills = skills_section.strip().split("Professional Skills:")[1]
+                job_type = job_type_section.strip("** \n")
+                job_type_search = f"For roles like {job_type}"
+                st.markdown(f"""#### For roles like:    
+- {job_type}""")
+                required_skills = db_skills.similarity_search(job_type_search, k=10)
+                required_skills = [item.page_content for item in required_skills]
                 skill_gap = PromptTemplate.from_template(resume_skill_gap)
-                skill_gap = skill_gap.format(required_skills=skills, acquired_skills=data)
+                skill_gap = skill_gap.format(required_skills=required_skills, acquired_skills=acquired_skills, job_type=job_type)
                 data_skills = llm.invoke(skill_gap).content
                 st.write(data_skills)

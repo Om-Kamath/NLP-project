@@ -46,3 +46,19 @@ ids_skills = [str(i) for i in range(1, len(docs_skills) + 1)]
 db_skills = Chroma.from_documents(docs_skills, embedding_function, persist_directory="./chroma_db_skills", ids=ids_skills)
 
 print("Data loaded successfully")
+
+
+loader_academic = TextLoader("converted_text/merged_data_academic.txt")
+documents_academic = loader_academic.load()
+
+docs_academic = text_splitter.split_documents(documents_academic)
+print(len(docs_academic))
+print("Documents split successfully")
+print(docs_academic[0])
+
+# create simple ids
+ids_academic = [str(i) for i in range(1, len(docs_academic) + 1)]
+
+db_skills = Chroma.from_documents(docs_academic, embedding_function, persist_directory="./chroma_db_academic", ids=ids_academic)
+
+print("Data loaded successfully")
