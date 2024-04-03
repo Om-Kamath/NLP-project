@@ -349,20 +349,29 @@ elif option == 'Resume Analyser':
             pdf_content = ""
             for line in per_line_words:
                 pdf_content += " ".join(line) + "\n"
+            
+            print("----------PDF CONTENT-----------")
+            print(pdf_content)
 
             with st.spinner("Churning out the results..."):
                 full_prompt = PromptTemplate.from_template(resume_template)
                 prompt = full_prompt.format(resume_text=pdf_content)
                 data = llm.invoke(prompt).content
-                skills_section, job_type_section = data.split("Job Type:")
-                acquired_skills = skills_section.strip().split("Professional Skills:")[1]
-                job_type = job_type_section.strip("** \n")
-                job_type_search = f"For roles like {job_type}"
-                st.markdown(f"""#### For roles like:    
+                sections = data.split("Job Type:")
+                skills_section = ""
+                job_type_section = ""
+                if len(sections) == 2:
+                    skills_section, job_type_section = sections
+                    acquired_skills = skills_section.strip().split("Professional Skills:")[1]
+                    job_type = job_type_section.strip("** \n")
+                    job_type_search = f"For roles like {job_type}"
+                    st.markdown(f"""#### For roles like:    
 {job_type}""")
-                required_skills = db_skills.similarity_search(job_type_search, k=10)
-                required_skills = [item.page_content for item in required_skills]
-                skill_gap = PromptTemplate.from_template(resume_skill_gap)
-                skill_gap = skill_gap.format(required_skills=required_skills, acquired_skills=acquired_skills, job_type=job_type)
-                data_skills = llm.invoke(skill_gap).content
-                st.write(data_skills)
+                    required_skills = db_skills.similarity_search(job_type_search, k=10)
+                    required_skills = [item.page_content for item in required_skills]
+                    skill_gap = PromptTemplate.from_template(resume_skill_gap)
+                    skill_gap = skill_gap.format(required_skills=required_skills, acquired_skills=acquired_skills, job_type=job_type)
+                    data_skills = llm.invoke(skill_gap).content
+                    st.write(data_skills)
+                else:
+                    st.warning("Unable to parse text, please try again.", icon="⚠️")
